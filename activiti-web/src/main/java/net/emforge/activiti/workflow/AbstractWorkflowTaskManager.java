@@ -151,6 +151,39 @@ public abstract class AbstractWorkflowTaskManager implements WorkflowTaskManager
 		return taskInfoQueryWrapper;
 	}
 
+	protected TaskInfoQueryWrapper createQueryWrapperByUserOrUserRoles(long companyId,
+			long userId, Boolean completed) throws WorkflowException {
+		String userName = idMappingService.getUserName(userId);
+		
+		TaskInfoQueryWrapper taskInfoQueryWrapper = createQueryWrapper(companyId, completed);
+		
+		// TODO: why candidateUser?
+		// Use candidate group.
+		// taskInfoQueryWrapper.getTaskInfoQuery().taskCandidateUser(userName);
+		
+		// Get candidate groups by user
+		
+		List<Group> groups = liferayIdentityService.findGroupsByUser(userName);
+		List<String> candidateGroups = new ArrayList<String>();
+		for (Group group : groups) {
+			candidateGroups.add(group.getId());
+		}
+		_log.debug("candidateGroups: " + candidateGroups);
+		// add empty group
+		if (candidateGroups.isEmpty()) {
+			candidateGroups.add("");
+		}
+		taskInfoQueryWrapper.getTaskInfoQuery().or()
+			.taskCandidateGroupIn(candidateGroups)
+			.taskAssignee(userName)
+			.endOr();
+//		if (taskInfoQueryWrapper.getTaskInfoQuery() instanceof CustomTaskQuery) {
+//			((CustomTaskQuery)taskInfoQueryWrapper.getTaskInfoQuery()).taskUnassigned();
+//		}
+		
+		return taskInfoQueryWrapper;
+	}
+	
 	protected TaskInfoQueryWrapper createQueryWrapperByWorkflowInstance(
 			long companyId, Long userId, long workflowInstanceId,
 			Boolean completed) throws WorkflowException {
@@ -264,7 +297,10 @@ public abstract class AbstractWorkflowTaskManager implements WorkflowTaskManager
 			Boolean completed, Boolean searchByUserRoles) throws WorkflowException {
 		TaskInfoQueryWrapper taskInfoQueryWrapper;
 		
-		if (searchByUserRoles != null && searchByUserRoles == true) {
+		if (searchByUserRoles == null ) {
+			taskInfoQueryWrapper = createQueryWrapperByUserOrUserRoles(
+					companyId, userId, completed);
+		} else if ( searchByUserRoles == true) {
 			taskInfoQueryWrapper = createQueryWrapperByUserRoles(
 					companyId, userId, completed);
 		} else {
